@@ -4,6 +4,7 @@ import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-g
 import { Canvas, Group, Image, Paragraph, Skia, TextAlign, useAnimatedImageValue, useFonts, useImage } from '@shopify/react-native-skia'
 import { Easing, Extrapolation, cancelAnimation, interpolate, runOnJS, useAnimatedReaction, useDerivedValue, useFrameCallback, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Audio } from 'expo-av'
 
 const GRAVITY = 700
 const JUMP_FORCE = -360
@@ -16,11 +17,10 @@ const PIPE_DISTANCE = 190
 
 const App = () => {
   const { width: w, height: h } = useWindowDimensions()
+  const [jumpSound, setJumpSound] = useState<Audio.Sound>()
   const [score, setScore] = useState(0)
 
-  const fonts = useFonts({
-    mono: [require('../assets/fonts/SpaceMono-Regular.ttf')]
-  })
+  const fonts = useFonts({ mono: [require('../assets/fonts/SpaceMono-Regular.ttf')] })
 
   const insets = useSafeAreaInsets()
   const bg = useImage(require('../sprites/background-day.png'))
@@ -50,6 +50,16 @@ const App = () => {
   const birdX = width / 4 - 20
   const birdY = useSharedValue(0)
   const birdVelocity = useSharedValue(200)
+
+  const loadSound = () => {
+    setTimeout(async () => {
+      const { sound: bgSound } = await Audio.Sound.createAsync(require('../assets/audios/cruising-down-8bit-lane-159615.mp3'))
+      const { sound: _jumpSound } = await Audio.Sound.createAsync(require('../assets/audios/cartoon-jump.mp3'))
+      await bgSound.setIsLoopingAsync(true)
+      await bgSound.playAsync()
+      setJumpSound(_jumpSound)
+    }, 1000)
+  }
 
   const birdRotation = useDerivedValue(() => {
     return [
@@ -92,6 +102,9 @@ const App = () => {
   const gesture = Gesture.Tap().onStart(() => {
     if (!isGameOver.value) {
       birdVelocity.value = JUMP_FORCE
+      jumpSound?.stopAsync().then(() => {
+        jumpSound?.playAsync().catch(() => {})
+      }).catch((e) => {})
     } else {
       runOnJS(restart)()
     }
@@ -161,6 +174,7 @@ const App = () => {
 
   useEffect(() => {
     restart()
+    loadSound()
   }, [])
 
   useEffect(() => {
