@@ -16,7 +16,8 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.zoom2009.skia-game-with-web"
     },
     "android": {
       "adaptiveIcon": {

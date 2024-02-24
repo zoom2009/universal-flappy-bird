@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { TouchableOpacity, View, useWindowDimensions, Image as RNImage, Platform } from 'react-native'
+import { TouchableOpacity, View, useWindowDimensions, Image as RNImage, Platform, Text } from 'react-native'
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler'
-import { Canvas, Group, Image, Paragraph, Skia, TextAlign, useAnimatedImageValue, useFonts, useImage } from '@shopify/react-native-skia'
+import { Canvas, Group, Image, useAnimatedImageValue, useImage } from '@shopify/react-native-skia'
 import { Easing, Extrapolation, cancelAnimation, interpolate, runOnJS, useAnimatedReaction, useDerivedValue, useFrameCallback, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Audio } from 'expo-av'
@@ -23,8 +23,6 @@ const App = () => {
   const [score, setScore] = useState(0)
   const [isPlayingFistTime, setIsPlayingFirstTime] = useState(true)
 
-  const fonts = useFonts({ mono: [require('../assets/fonts/SpaceMono-Regular.ttf')] })
-
   const insets = useSafeAreaInsets()
   const bg = useImage(require('../sprites/background-day.png'))
   const bgNight = useImage(require('../sprites/background-night.png'))
@@ -37,12 +35,16 @@ const App = () => {
   const isGameOver = useSharedValue(false)
 
   const width = useMemo(() => {
-    if (w > 800) return 800
+    if (Platform.OS === 'web') {
+      if (w > 800) return 800
+    }
     return w
   }, [w])
 
   const height = useMemo(() => {
-    if (h > 800) return 800
+    if (Platform.OS === 'web') {
+      if (h > 800) return 800
+    } 
     return h
   }, [h])
 
@@ -66,7 +68,7 @@ const App = () => {
       const { sound: _bgSound } = await Audio.Sound.createAsync(require('../assets/audios/cruising-down-8bit-lane-159615.mp3'))
       const { sound: _jumpSound } = await Audio.Sound.createAsync(require('../assets/audios/cartoon-jump.mp3'))
       await _bgSound.setIsLoopingAsync(true)
-      await _bgSound.setVolumeAsync(0.6)
+      await _bgSound.setVolumeAsync(0.7)
       setBgSound(_bgSound)
       setJumpSound(_jumpSound)
     } catch (e) {
@@ -119,13 +121,15 @@ const App = () => {
     if (!isPlayingFistTime) {
       if (!isGameOver.value) {
         birdVelocity.value = JUMP_FORCE
-        jumpSound?.stopAsync().then(() => {
-          jumpSound?.playAsync().catch(() => {})
-        }).catch((e) => {})
+        runOnJS(() => jumpSound?.playFromPositionAsync(0).catch(() => {}))()
+        // runOnJS(jumpSound?.stopAsync)().then(() => console.log('stop'))
+        // ().then(() => {
+        //   jumpSound?.playAsync().catch(() => {})
+        // }).catch((e) => {})
       }
     } else {
       runOnJS(setIsPlayingFirstTime)(false)
-      bgSound?.playAsync().catch(() => {})
+      runOnJS(() => bgSound?.playAsync().catch(() => {}))()
       runOnJS(restart)()
     }
   }
@@ -215,28 +219,6 @@ const App = () => {
     }
   }, [score])
 
-  const paragraph = useMemo(() => {
-    if (!fonts) return null
-    const paragraphStyle = { textAlign: TextAlign.Center }
-    const textStyle = {
-      color: Skia.Color('white'),
-      fontFamilies: ['mono'],
-      fontSize: 36,
-    }
-    if (!isPlayingFistTime) return (
-      Skia.ParagraphBuilder.Make(paragraphStyle, fonts)
-        .pushStyle(textStyle)
-        .addText(`Score: ${score}`)
-        .build()
-    )
-    return (
-      Skia.ParagraphBuilder.Make(paragraphStyle, fonts)
-        .pushStyle(textStyle)
-        .addText('Tap to play!')
-        .build()
-    )
-  }, [fonts, score, isPlayingFistTime])
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <GestureDetector gesture={gesture}>
@@ -250,17 +232,19 @@ const App = () => {
             }}
           >
             <Image
-              height={height - 100}
+              height={height - 90}
               width={width}
               image={bg}
               fit='cover'
+              y={0}
               opacity={bgOpacity}
             />
             <Image
-              height={height - 100}
+              height={height - 90}
               width={width}
               image={bgNight}
               fit='cover'
+              y={0}
               opacity={bgNightOpacity}
             />
             <Image
@@ -284,12 +268,6 @@ const App = () => {
               fit='fill'
               y={height - 100}
               x={baseX}
-            />
-            <Paragraph
-              paragraph={paragraph}
-              x={0}
-              y={insets.top + 20}
-              width={width}
             />
             <Group
               transform={birdRotation}
@@ -329,6 +307,19 @@ const App = () => {
             />
           </TouchableOpacity>
           )}
+          <Text
+            style={{
+              position: 'absolute',
+              top: insets.top + 20,
+              width: '100%',
+              textAlign: 'center',
+              color: 'white',
+              fontSize: 34,
+              fontWeight: '900'
+            }}
+          >
+            {`Score: ${score}`}
+          </Text>
         </View>
       </GestureDetector>
     </GestureHandlerRootView>
