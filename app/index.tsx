@@ -14,7 +14,7 @@ const BIRD_HEIGHT = 40
 const BIRD_WIDTH = 64
 const PIPE_WIDTH = 104
 const PIPE_HEIGHT = 640
-const PIPE_DISTANCE = 190
+ const PIPE_DISTANCE = 190
 
 const App = () => {
   const { width: w, height: h } = useWindowDimensions()
