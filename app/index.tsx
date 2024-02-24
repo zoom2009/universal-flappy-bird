@@ -121,15 +121,15 @@ const App = () => {
     if (!isPlayingFistTime) {
       if (!isGameOver.value) {
         birdVelocity.value = JUMP_FORCE
-        runOnJS(() => jumpSound?.playFromPositionAsync(0).catch(() => {}))()
+        runOnJS(() => jumpSound?.playFromPositionAsync(0).catch((e) => console.log('e:', e)))()
         // runOnJS(jumpSound?.stopAsync)().then(() => console.log('stop'))
         // ().then(() => {
         //   jumpSound?.playAsync().catch(() => {})
         // }).catch((e) => {})
       }
     } else {
+      runOnJS(() => bgSound?.playAsync().catch((e) => console.log('e:', e)))()
       runOnJS(setIsPlayingFirstTime)(false)
-      runOnJS(() => bgSound?.playAsync().catch(() => {}))()
       runOnJS(restart)()
     }
   }
@@ -222,7 +222,7 @@ const App = () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <GestureDetector gesture={gesture}>
-        <View style={{ position: 'relative', flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ccc' }}>
+        <View style={{ height, position: 'relative', flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ccc' }}>
           <Canvas
             style={{
               width,
@@ -232,19 +232,17 @@ const App = () => {
             }}
           >
             <Image
-              height={height - 90}
+              height={height - 100}
               width={width}
               image={bg}
               fit='cover'
-              y={0}
               opacity={bgOpacity}
             />
             <Image
-              height={height - 90}
+              height={height - 100}
               width={width}
               image={bgNight}
               fit='cover'
-              y={0}
               opacity={bgNightOpacity}
             />
             <Image
