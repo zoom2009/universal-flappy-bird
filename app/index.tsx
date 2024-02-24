@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { View, useWindowDimensions } from 'react-native'
+import { TouchableOpacity, View, useWindowDimensions, Image as RNImage, Platform } from 'react-native'
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler'
 import { Canvas, Group, Image, Paragraph, Skia, TextAlign, useAnimatedImageValue, useFonts, useImage } from '@shopify/react-native-skia'
 import { Easing, Extrapolation, cancelAnimation, interpolate, runOnJS, useAnimatedReaction, useDerivedValue, useFrameCallback, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Audio } from 'expo-av'
+import useHotkeys from '@/hook/useHotkeys'
 
 const GRAVITY = 700
 const JUMP_FORCE = -360
-const IMAGE_SWAP_FROM_SCORE = 10
+const IMAGE_SWAP_FROM_SCORE = 15
 const BIRD_HEIGHT = 40
 const BIRD_WIDTH = 64
 const PIPE_WIDTH = 104
@@ -17,8 +18,10 @@ const PIPE_DISTANCE = 190
 
 const App = () => {
   const { width: w, height: h } = useWindowDimensions()
+  const [bgSound, setBgSound] = useState<Audio.Sound>()
   const [jumpSound, setJumpSound] = useState<Audio.Sound>()
   const [score, setScore] = useState(0)
+  const [isPlayingFistTime, setIsPlayingFirstTime] = useState(true)
 
   const fonts = useFonts({ mono: [require('../assets/fonts/SpaceMono-Regular.ttf')] })
 
@@ -29,7 +32,8 @@ const App = () => {
   const pipeTop = useImage(require('../sprites/pipe-green-top.png'))
   const pipeBottom = useImage(require('../sprites/pipe-green-bottom.png'))
   const base = useImage(require('../sprites/base.png'))
-
+  const gameOver = useImage(require('../sprites/gameover.png'))
+  const [isShowTryAgain, setIsShowTryAgain] = useState(false)
   const isGameOver = useSharedValue(false)
 
   const width = useMemo(() => {
@@ -48,23 +52,33 @@ const App = () => {
 
   const baseX = useSharedValue(0)
   const birdX = width / 4 - 20
-  const birdY = useSharedValue(0)
+  const birdY = useSharedValue(200)
   const birdVelocity = useSharedValue(200)
 
-  const loadSound = () => {
-    setTimeout(async () => {
-      const { sound: bgSound } = await Audio.Sound.createAsync(require('../assets/audios/cruising-down-8bit-lane-159615.mp3'))
+  const gameOverOpacity = useDerivedValue(() => {
+    return isGameOver.value
+      ? withTiming(1, { duration: 800 })
+      : 0
+  })
+
+  const loadSound = async () => {
+    try {
+      const { sound: _bgSound } = await Audio.Sound.createAsync(require('../assets/audios/cruising-down-8bit-lane-159615.mp3'))
       const { sound: _jumpSound } = await Audio.Sound.createAsync(require('../assets/audios/cartoon-jump.mp3'))
-      await bgSound.setIsLoopingAsync(true)
-      await bgSound.playAsync()
+      await _bgSound.setIsLoopingAsync(true)
+      await _bgSound.setVolumeAsync(0.6)
+      setBgSound(_bgSound)
       setJumpSound(_jumpSound)
-    }, 1000)
+    } catch (e) {
+      console.log('e:', e)
+    }
   }
 
   const birdRotation = useDerivedValue(() => {
-    return [
+    if (!isPlayingFistTime) return [
       { rotate: interpolate(birdVelocity.value, [-500, 500], [-0.5, 0.5], Extrapolation.CLAMP) }
     ]
+    return []
   })
 
   const bgOpacity = useSharedValue(1)
@@ -75,6 +89,7 @@ const App = () => {
   })
 
   const restart = () => {
+    setIsShowTryAgain(false)
     isGameOver.value = false
     birdY.value = 200
     baseX.value = 0
@@ -97,18 +112,26 @@ const App = () => {
     isGameOver.value = true
     cancelAnimation(baseX)
     cancelAnimation(pipeX)
+    runOnJS(setIsShowTryAgain)(true)
   }
 
-  const gesture = Gesture.Tap().onStart(() => {
-    if (!isGameOver.value) {
-      birdVelocity.value = JUMP_FORCE
-      jumpSound?.stopAsync().then(() => {
-        jumpSound?.playAsync().catch(() => {})
-      }).catch((e) => {})
+  const onTap = () => {
+    if (!isPlayingFistTime) {
+      if (!isGameOver.value) {
+        birdVelocity.value = JUMP_FORCE
+        jumpSound?.stopAsync().then(() => {
+          jumpSound?.playAsync().catch(() => {})
+        }).catch((e) => {})
+      }
     } else {
+      runOnJS(setIsPlayingFirstTime)(false)
+      bgSound?.playAsync().catch(() => {})
       runOnJS(restart)()
     }
-  })
+  }
+
+  const gesture = Gesture.Tap().onStart(onTap)
+  useHotkeys('space', () => onTap())
 
   useAnimatedReaction(
     () => birdY.value,
@@ -166,49 +189,58 @@ const App = () => {
   )
 
   useFrameCallback(({ timeSincePreviousFrame: dt }) => {
-    if (dt && !isGameOver.value) {
+    if (dt && !isGameOver.value && !isPlayingFistTime) {
       birdY.value = birdY.value + (birdVelocity.value * dt / 1000)
       birdVelocity.value = birdVelocity.value + (GRAVITY * dt) / 1000
     }
   })
 
   useEffect(() => {
-    restart()
     loadSound()
   }, [])
 
   useEffect(() => {
-    if (score === IMAGE_SWAP_FROM_SCORE) {
-      bgOpacity.value = withTiming(0, { duration: 1000 })
-      setTimeout(() => {
-        bgNightOpacity.value = withTiming(1, { duration: 1500 })
-      }, 800)
+    if (score > 0 && score % IMAGE_SWAP_FROM_SCORE === 0) {
+      if (bgOpacity.value === 1) {
+        bgOpacity.value = withTiming(0, { duration: 1000 })
+        setTimeout(() => {
+          bgNightOpacity.value = withTiming(1, { duration: 1500 })
+        }, 800)
+      } else {
+        bgNightOpacity.value = withTiming(0, { duration: 1000 })
+        setTimeout(() => {
+          bgOpacity.value = withTiming(1, { duration: 1500 })
+        }, 800)
+      }
     }
   }, [score])
 
   const paragraph = useMemo(() => {
     if (!fonts) return null
-
-    const paragraphStyle = {
-      textAlign: TextAlign.Center
-    }
-
+    const paragraphStyle = { textAlign: TextAlign.Center }
     const textStyle = {
       color: Skia.Color('white'),
       fontFamilies: ['mono'],
       fontSize: 36,
     }
-
-    return Skia.ParagraphBuilder.Make(paragraphStyle, fonts)
-      .pushStyle(textStyle)
-      .addText(`Score: ${score}`)
-      .build()
-  }, [fonts, score])
+    if (!isPlayingFistTime) return (
+      Skia.ParagraphBuilder.Make(paragraphStyle, fonts)
+        .pushStyle(textStyle)
+        .addText(`Score: ${score}`)
+        .build()
+    )
+    return (
+      Skia.ParagraphBuilder.Make(paragraphStyle, fonts)
+        .pushStyle(textStyle)
+        .addText('Tap to play!')
+        .build()
+    )
+  }, [fonts, score, isPlayingFistTime])
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <GestureDetector gesture={gesture}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ccc' }}>
+        <View style={{ position: 'relative', flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ccc' }}>
           <Canvas
             style={{
               width,
@@ -217,24 +249,20 @@ const App = () => {
               margin: 'auto'
             }}
           >
-            {score <= IMAGE_SWAP_FROM_SCORE + 1 && (
-              <Image
-                height={height - 100}
-                width={width}
-                image={bg}
-                fit='cover'
-                opacity={bgOpacity}
-              />
-            )}
-            {score >= IMAGE_SWAP_FROM_SCORE - 1 && (
-              <Image
-                height={height - 100}
-                width={width}
-                image={bgNight}
-                fit='cover'
-                opacity={bgNightOpacity}
-              />
-            )}
+            <Image
+              height={height - 100}
+              width={width}
+              image={bg}
+              fit='cover'
+              opacity={bgOpacity}
+            />
+            <Image
+              height={height - 100}
+              width={width}
+              image={bgNight}
+              fit='cover'
+              opacity={bgNightOpacity}
+            />
             <Image
               width={PIPE_WIDTH}
               height={PIPE_HEIGHT}
@@ -275,7 +303,32 @@ const App = () => {
                 y={birdY}
               />
             </Group>
+            <Image
+              height={84}
+              width={width * 0.7}
+              x={width / 2 - (width * 0.7 / 2)}
+              y={height / 2 - 84}
+              image={gameOver}
+              opacity={gameOverOpacity}
+              fit="contain"
+            />
           </Canvas>
+          {isShowTryAgain && (
+          <TouchableOpacity
+            style={{ backgroundColor: 'white', borderRadius: 250, paddingHorizontal: 16, paddingVertical: 6, position: 'absolute', top: insets.bottom + 50 + height / 2, zIndex: 10 }}
+            onPress={runOnJS(restart)}
+          >
+            <RNImage
+              source={require('../sprites/tryagain.png')}
+              resizeMode="contain"
+              style={{
+                width: 250,
+                height: 40,
+                resizeMode: 'contain',
+              }}
+            />
+          </TouchableOpacity>
+          )}
         </View>
       </GestureDetector>
     </GestureHandlerRootView>
