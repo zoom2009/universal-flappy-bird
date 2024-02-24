@@ -122,10 +122,6 @@ const App = () => {
       if (!isGameOver.value) {
         birdVelocity.value = JUMP_FORCE
         runOnJS(() => jumpSound?.playFromPositionAsync(0).catch((e) => console.log('e:', e)))()
-        // runOnJS(jumpSound?.stopAsync)().then(() => console.log('stop'))
-        // ().then(() => {
-        //   jumpSound?.playAsync().catch(() => {})
-        // }).catch((e) => {})
       }
     } else {
       runOnJS(() => bgSound?.playAsync().catch((e) => console.log('e:', e)))()
