@@ -3,12 +3,12 @@
   "main": "src/index",
   "version": "1.0.0",
   "scripts": {
+    "web-build": "npx expo export -p web && cd dist && yarn setup-skia-web",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test": "jest --watchAll",
-    "postinstall": "yarn setup-skia-web"
+    "test": "jest --watchAll"
   },
   "jest": {
     "preset": "jest-expo"

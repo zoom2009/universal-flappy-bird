@@ -8,7 +8,7 @@ import { renderRootComponent } from "expo-router/build/renderRootComponent"
 // should be added here.
 LoadSkiaWeb({
   locateFile: (file) => {
-    return `/public/${file}`
+    return `/${file}`
   },
 }).then(async () => {
   renderRootComponent(App)
